@@ -1,0 +1,12 @@
+# Emogic docker-compose!
+# 2025-05-17
+
+services:
+  emogic:
+    build:
+      context: '.'
+    container_name: bot_emogic
+    environment:
+      - EMOGIC_TOKEN=${EMOGIC_TOKEN}
+      - EMOGIC_METADATA_PATH=${EMOGIC_METADATA_PATH:-/metadata/metadata.json}
+    restart: unless-stopped
