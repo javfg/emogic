@@ -8,5 +8,10 @@ services:
     container_name: bot_emogic
     environment:
       - EMOGIC_TOKEN=${EMOGIC_TOKEN}
-      - EMOGIC_METADATA_PATH=${EMOGIC_METADATA_PATH:-/metadata/metadata.json}
+      - EMOGIC_DUMP_GROUP_IDS=${EMOGIC_DUMP_GROUP_IDS}
+      - EMOGIC_DATA_PATH=${EMOGIC_METADATA_PATH:-./metadata}
+      - EMOGIC_LOG_LEVEL=${EMOGIC_LOG_LEVEL:-debug}
+      - EMOGIC_STICKER_CACHE_SIZE=${EMOGIC_STICKER_CACHE_SIZE:-100}
+    volumes:
+      - ${EMOGIC_DATA_PATH:-./metadata}:/app/metadata
     restart: unless-stopped

@@ -1,95 +1,73 @@
-import json
-import os
-import random
-from pathlib import Path
+from random import shuffle
 
 import grapheme
-from dotenv import load_dotenv
 from loguru import logger
-from telegram import InlineQueryResultPhoto, Update
-from telegram.ext import ApplicationBuilder, ContextTypes, InlineQueryHandler
+from telegram import Update
+from telegram.ext import Application, ApplicationBuilder, ContextTypes, InlineQueryHandler
+
+from emogic.config import config
+from emogic.emoji_manager import emoji_manager
+from emogic.sticker import sticker_uploader
+from emogic.util import anything, cs
 
 
-def build_result_photo(index: int, key: str | int, element: dict) -> InlineQueryResultPhoto:
-    img = element.get("gStaticUrl", "")
-    emojis = [element.get("leftEmoji"), element.get("rightEmoji")]
-    caption = f"{element.get('alt')}, {emojis}"
-    return InlineQueryResultPhoto(
-        id=f"{key}-{index}",
-        thumbnail_url=img,
-        photo_url=img,
-        caption=caption,
-    )
-
-
-async def emoji(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
-    # check if there is a query
-    if not update.inline_query:
+async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.inline_query or len(update.inline_query.query) > 20:
         return
 
-    query = update.inline_query.query
-
-    # check if the query contains a sane length
-    if not query or len(query) > 20:
-        return
-
+    query = update.inline_query.query.replace(" ", "").replace(":", "")
     clusters = list(grapheme.graphemes(query))
 
-    # check if the query contains one or two emoji
     if not clusters or len(clusters) > 2:
         return
 
-    emoji_codepoints = []
-    for cluster in clusters:
-        if cluster:
-            emoji_codepoints.append("-".join(format(ord(c), "x") for c in cluster))
+    codepoint_sequences = [cs(c) for c in clusters]
+    logger.info(f"emoji codepoint sequences: {codepoint_sequences}")
 
-    logger.info(f"emoji codepoints: {emoji_codepoints}")
-
-    collection = metadata["data"].get(emoji_codepoints[0])
-    if not collection:
+    left_emoji = emoji_manager.get_emoji_by_codepoint_sequence(codepoint_sequences[0])
+    if not left_emoji:
         return
 
-    if len(emoji_codepoints) == 1:
-        # if there is only one emoji, return the list of combinations
-        combinations = collection["combinations"]
-        results = []
+    # if there is only one emoji, get the combinations for it
+    if len(codepoint_sequences) == 1:
+        offset = int(update.inline_query.offset or 0)
+        batch_size = len(config.dump_group_ids)
+        combinations = list(left_emoji.combinations.values())
+        shuffle(combinations)
+        stickers = anything([await c.as_sticker(context) for c in combinations[offset : offset + batch_size]])
+        if not stickers:
+            logger.info(f"no combinations found for {left_emoji.description}")
+            return
+        offset = offset + batch_size
 
-        for key, list_of_emojis in combinations.items():
-            for index, element in enumerate(list_of_emojis):
-                results.append(build_result_photo(index, key, element))
+        await update.inline_query.answer(stickers, next_offset=str(offset), cache_time=0)
 
-    elif len(emoji_codepoints) == 2:
-        # if there are two emojis, return the combination
-        combination_list = collection["combinations"].get(emoji_codepoints[1])
-
-        if not combination_list:
+    # if there are two emojis, get the combinations between them
+    elif len(codepoint_sequences) == 2:
+        right_emoji = emoji_manager.get_emoji_by_codepoint_sequence(codepoint_sequences[1])
+        if not right_emoji:
+            return
+        combination = left_emoji.get_combination_with(right_emoji)
+        if not combination:
+            logger.info(f"combination not found for {left_emoji.description} and {right_emoji.description}")
+            return
+        sticker = await combination.as_sticker(context)
+        if not sticker:
+            logger.info(f"failed to create sticker for {left_emoji.description} and {right_emoji.description}")
             return
 
-        results = [build_result_photo(index, 0, element) for index, element in enumerate(combination_list)]
-
-    if update.inline_query:
-        logger.info(f"found {len(results)} results for {query}")
-        random.shuffle(results)
-        await update.inline_query.answer(results=lambda x: results[x : x + 50], auto_pagination=True)
+        await update.inline_query.answer([sticker])
 
 
-load_dotenv()
+def main():
+    logger.info("starting bot")
 
-token = os.environ.get("EMOGIC_TOKEN")
-if not token:
-    raise ValueError("no token found in environment variables")
+    # graceful shutdown — write file_ids to file
+    async def shutdown_handler(app: Application) -> None:
+        logger.warning("shutting down gracefully")
+        await sticker_uploader.flush_file_id_cache()
 
-metadata_env_var = os.environ.get("EMOGIC_METADATA_PATH")
-if not metadata_env_var:
-    raise ValueError("no metadata path found in environment variables")
-metadata_path = Path(metadata_env_var).absolute()
+    app = ApplicationBuilder().write_timeout(240).post_shutdown(shutdown_handler).token(config.token).build()
+    app.add_handler(InlineQueryHandler(handle))
 
-logger.info(f"loading metadata from {metadata_path}")
-metadata = json.loads(metadata_path.read_text())
-
-app = ApplicationBuilder().token(token).build()
-app.add_handler(InlineQueryHandler(emoji))
-
-logger.info("starting bot")
-app.run_polling()
+    app.run_polling()

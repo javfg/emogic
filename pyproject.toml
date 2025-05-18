@@ -1,11 +1,13 @@
 [project]
 name = "emogic"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.0-beta.1"
+description = "Emoji kitchen bot for Telegram"
 readme = "README.md"
 authors = [{ name = "Javier Ferrer", email = "javier.f.g@um.es" }]
 requires-python = ">=3.13"
 dependencies = [
+    "aiofiles>=24.1.0",
+    "aiohttp>=3.11.18",
     "dotenv>=0.9.9",
     "grapheme>=0.6.0",
     "loguru>=0.7.3",
@@ -13,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-emogic = "emogic:main"
+emogic = "emogic:main.main"
 
 [build-system]
 requires = ["hatchling"]
