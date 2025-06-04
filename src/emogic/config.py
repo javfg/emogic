@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -30,11 +31,18 @@ class Config:
         self.dump_group_ids = must_list("EMOGIC_DUMP_GROUP_IDS")
         self.emoji_data_path = must_path("EMOGIC_DATA_PATH") / "emoji.json"
         self.sticker_data_path = must_path("EMOGIC_DATA_PATH") / "ids.ndjson"
+        log_path = must_path("EMOGIC_LOG_PATH")
         log_level = os.environ.get("EMOGIC_LOG_LEVEL", "INFO")
         self.sticker_cache_size = int(os.environ.get("EMOGIC_STICKER_CACHE_SIZE", 0))
 
         logger.remove()
         logger.add(sink=sys.stderr, level=log_level)
+        logger.add(
+            sink=log_path / f"{datetime.now().strftime('%Y-%m-%d')}.log",
+            level=log_level,
+            rotation="6 months",
+            compression="zip",
+        )
 
         self.validate()
 

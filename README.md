@@ -17,8 +17,11 @@ Send an emoji or two to the bot and explore! :robot: :rocket:
     EMOGIC_TOKEN="${bot_token}"
     EMOGIC_DUMP_GROUP_IDS="${group_id_1} ${group_id_2}"
     EMOGIC_DATA_PATH="./metadata"
+    EMOGIC_LOG_PATH="./logs"
     EMOGIC_LOG_LEVEL="DEBUG"
     EMOGIC_STICKER_CACHE_SIZE=100
+    EMOGIC_UID=17000
+    EMOGIC_GID=17000
     EOF
     ```
 6. Run the bot:
