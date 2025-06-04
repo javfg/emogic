@@ -6,6 +6,7 @@ services:
     build:
       context: '.'
     container_name: bot_emogic
+    user: '${EMOGIC_UID:-1000}:${EMOGIC_GID:-1000}'
     environment:
       - EMOGIC_TOKEN=${EMOGIC_TOKEN}
       - EMOGIC_DUMP_GROUP_IDS=${EMOGIC_DUMP_GROUP_IDS}
@@ -14,4 +15,5 @@ services:
       - EMOGIC_STICKER_CACHE_SIZE=${EMOGIC_STICKER_CACHE_SIZE:-100}
     volumes:
       - ${EMOGIC_DATA_PATH:-./metadata}:/app/metadata
+      - ${EMOGIC_LOGS_PATH:-./logs}:/app/logs
     restart: unless-stopped
